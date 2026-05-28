@@ -22,8 +22,6 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
-      matrix:
-        target: [unix, ESP32_GENERIC, ESP32_GENERIC_S3]
 
     steps:
       - name: Determine MicroPython Ref Target
@@ -59,13 +57,11 @@ jobs:
       - name: Fetch and Structurally Link Berkeley DB Submodules
         run: |
           cd src-micropython
-          # Shallow fetch core readline elements
-          git submodule update --init --depth 1 lib/utils lib/mp-readline
+          git submodule update --init --recursive --depth 1 --jobs 8
           
           # Clone the flat embedded repository configuration files
           rm -rf lib/berkeley-db-1.xx
           git clone https://github.com/pfalcon/berkeley-db-1.xx -b embedded lib/berkeley-db-1.xx
-           -b embedded lib/berkeley-db-1.xx
 
           # Fix for Unix Makefile includes (-I../../lib/berkeley-db-1.xx/include)
           mkdir -p lib/berkeley-db-1.xx/include/berkeley-db
