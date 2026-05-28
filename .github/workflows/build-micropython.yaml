@@ -106,3 +106,15 @@ jobs:
         with:
           name: micropython-binaries-${{ matrix.target }}
           path: ${{ github.workspace }}/exports/*
+
+      - name: Create Public Pre-Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: "latest-${{ steps.get-ref.outputs.version }}"
+          name: "MicroPython ${{ steps.get-ref.outputs.version }} with ST7789"
+          body: "Automated custom compilation build output package for testing and deployment."
+          prerelease: true
+          files: ${{ github.workspace }}/exports/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
