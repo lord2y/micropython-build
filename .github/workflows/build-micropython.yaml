@@ -65,22 +65,11 @@ jobs:
           rm -rf lib/berkeley-db-1.xx lib/berkeley-db
           git clone https://github.com/pfalcon/berkeley-db-1.xx -b embedded lib/berkeley-db-1.xx
 
-          # Create a link directing the legacy include check back to the native Linux compiler queue
-          ln -s /usr/include/sys/queue.h lib/berkeley-db-1.xx/include/bsd-queue.h
-
-          # Fix for Unix Makefile includes (-I../../lib/berkeley-db-1.xx/include)
-          mkdir -p lib/berkeley-db-1.xx/include/berkeley-db
-          cp lib/berkeley-db-1.xx/include/*.h lib/berkeley-db-1.xx/include/berkeley-db/
-
-          # Fix for ESP32 CMake structure maps
-          mkdir -p lib/berkeley-db/berkeley-db
-          cp lib/berkeley-db-1.xx/include/*.h lib/berkeley-db/berkeley-db/
-          cp -r lib/berkeley-db-1.xx/btree lib/berkeley-db-1.xx/mpool lib/berkeley-db/
-
       - name: Build Cross-Compiler (mpy-cross)
         run: |
           cd src-micropython/mpy-cross
           make -j$(nproc)
+
 
       # --- BRANCH TARGET B: HARDWARE ESP32 FIRMWARES ---
       - name: Cache ESP-IDF Toolchain Installation
@@ -106,6 +95,7 @@ jobs:
           cd ~/esp/esp-idf
           . ./export.sh
           cd ${{ github.workspace }}/src-micropython/ports/esp32
+          make -j$(nproc) BOARD=ESP32_GENERIC submodules
           make -j$(nproc) BOARD=${{ matrix.target }} USER_C_MODULES=${{ github.workspace }}/src-st7789/micropython.cmake
           mkdir -p ${{ github.workspace }}/exports
           cp build-${{ matrix.target }}/firmware.bin ${{ github.workspace }}/exports/firmware-${{ matrix.target }}-${{ steps.get-ref.outputs.version }}.bin
