@@ -1,0 +1,117 @@
+name: Compile MicroPython with ST7789
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      micropython_version:
+        description: 'MicroPython Version Tag'
+        required: true
+        default: 'v1.28.0'
+        type: choice
+        options:
+          - 'v1.28.0'
+          - 'v1.27.0'
+          - 'v1.26.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [unix, ESP32_GENERIC, ESP32_GENERIC_S3]
+
+    steps:
+      - name: Determine MicroPython Ref Target
+        id: get-ref
+        run: |
+          # Use manual input selection if triggered manually, fallback to default v1.28.0 on push events
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.micropython_version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=v1.28.0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git wget flex bison gperf python3 python3-pip python3-venv \
+            cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0 pkg-config libreadline-dev
+
+      - name: Checkout Upstream ST7789 C Module
+        uses: actions/checkout@v4
+        with:
+          repository: russhughes/st7789_mpy
+          ref: master
+          path: src-st7789
+
+      - name: Checkout MicroPython Target
+        uses: actions/checkout@v4
+        with:
+          repository: micropython/micropython
+          ref: ${{ steps.get-ref.outputs.version }}
+          path: src-micropython
+
+      - name: Fetch and Structurally Link Berkeley DB Submodules
+        run: |
+          cd src-micropython
+          # Shallow fetch core readline elements
+          git submodule update --init --depth 1 lib/utils lib/mp-readline
+          
+          # Clone the flat embedded repository configuration files
+          rm -rf lib/berkeley-db-1.xx
+          git clone https://github.com/pfalcon/berkeley-db-1.xx -b embedded lib/berkeley-db-1.xx
+           -b embedded lib/berkeley-db-1.xx
+
+          # Fix for Unix Makefile includes (-I../../lib/berkeley-db-1.xx/include)
+          mkdir -p lib/berkeley-db-1.xx/include/berkeley-db
+          cp lib/berkeley-db-1.xx/include/*.h lib/berkeley-db-1.xx/include/berkeley-db/
+
+          # Fix for ESP32 CMake structure maps
+          mkdir -p lib/berkeley-db/berkeley-db
+          cp lib/berkeley-db-1.xx/include/*.h lib/berkeley-db/berkeley-db/
+          cp -r lib/berkeley-db-1.xx/btree lib/berkeley-db-1.xx/mpool lib/berkeley-db/
+
+      - name: Build Cross-Compiler (mpy-cross)
+        run: |
+          cd src-micropython/mpy-cross
+          make -j$(nproc)
+
+      # --- BRANCH TARGET B: HARDWARE ESP32 FIRMWARES ---
+      - name: Cache ESP-IDF Toolchain Installation
+        if: matrix.target != 'unix'
+        id: cache-esp-idf
+        uses: actions/cache@v4
+        with:
+          path: ~/.espressif
+          key: esp-idf-v5.5.1-v1
+
+      - name: Set up Espressif ESP-IDF v5.5.1
+        if: matrix.target != 'unix'
+        run: |
+          mkdir -p ~/esp
+          cd ~/esp
+          git clone -b v5.5.1 --recursive https://github.com/espressif/esp-idf.git
+          cd esp-idf
+          ./install.sh
+
+      - name: Compile ESP32 Target Firmware
+        if: matrix.target != 'unix'
+        run: |
+          cd ~/esp/esp-idf
+          . ./export.sh
+          cd ${{ github.workspace }}/src-micropython/ports/esp32
+          make -j$(nproc) BOARD=${{ matrix.target }} USER_C_MODULES=${{ github.workspace }}/src-st7789/micropython.cmake
+          mkdir -p ${{ github.workspace }}/exports
+          cp build-${{ matrix.target }}/firmware.bin ${{ github.workspace }}/exports/firmware-${{ matrix.target }}-${{ steps.get-ref.outputs.version }}.bin
+
+      # --- OUTPUT DISPATCH ARTIFACTS ---
+      - name: Upload Compiled Binary Objects
+        uses: actions/upload-artifact@v4
+        with:
+          name: micropython-binaries-${{ matrix.target }}
+          path: ${{ github.workspace }}/exports/*
