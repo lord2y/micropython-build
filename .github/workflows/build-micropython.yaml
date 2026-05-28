@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
+      matrix:
+        target: [ESP32_GENERIC, ESP32_GENERIC_S3]
 
     steps:
       - name: Determine MicroPython Ref Target
