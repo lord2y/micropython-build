@@ -60,6 +60,19 @@ jobs:
           ref: ${{ steps.get-ref.outputs.version }}
           path: src-micropython
 
+      - name: Capture Repository Metadata Tracking Hashes
+        id: metadata
+        run: |
+          # Extract the short 7-character commit hash for the ST7789 driver repo
+          cd ${{ github.workspace }}/src-st7789
+          ST7789_HASH=$(git rev-parse --short HEAD)
+          echo "st7789_sha=${ST7789_HASH}" >> $GITHUB_OUTPUT
+
+          # Extract the short 7-character commit hash for the MicroPython core repo
+          cd ${{ github.workspace }}/src-micropython
+          MPY_HASH=$(git rev-parse --short HEAD)
+          echo "mpy_sha=${MPY_HASH}" >> $GITHUB_OUTPUT
+
       - name: Fetch and Structurally Link Berkeley DB Submodules
         run: |
           cd src-micropython
@@ -111,14 +124,21 @@ jobs:
           name: micropython-binaries-${{ matrix.target }}
           path: ${{ github.workspace }}/exports/*
 
-      - name: Create Public Pre-Release
+      - name: Create Public Release
         uses: softprops/action-gh-release@v2
         if: github.event_name == 'workflow_dispatch'
         with:
           tag_name: "latest-${{ steps.get-ref.outputs.version }}"
           name: "MicroPython ${{ steps.get-ref.outputs.version }} with ST7789"
-          body: "Automated custom compilation build output package for testing and deployment."
-          prerelease: true
+
+          body: |
+            ### 🛠️ Build Metadata Tracking Info
+            This custom firmware compilation package was automatically built using the following repository source code versions:
+            * **MicroPython Core**: [`src-micropython@${{ steps.metadata.outputs.mpy_sha }}`](https://github.com{{ steps.metadata.outputs.mpy_sha }}) (Target Reference Selection: `${{ steps.get-ref.outputs.version }}`)
+            * **ST7789 Display Driver**: [`lord2y/st7789_mpy@${{ steps.metadata.outputs.st7789_sha }}`](https://github.com{{ steps.metadata.outputs.st7789_sha }})
+            * **Target ESP-IDF Toolchain**: `v5.3.2 stable` (Optimized for legacy ESP32 architecture compatibility)
+
+          prerelease: ${{ github.event.inputs.micropython_version != 'master' }}
           files: ${{ github.workspace }}/exports/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
