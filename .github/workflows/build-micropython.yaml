@@ -100,7 +100,7 @@ jobs:
           . ./export.sh
           cd ${{ github.workspace }}/src-micropython/ports/esp32
           make -j$(nproc) BOARD=ESP32_GENERIC submodules
-          make -j$(nproc) BOARD=${{ matrix.target }} USER_C_MODULES=${{ github.workspace }}/src-st7789/micropython.cmake
+          make -j$(nproc) BOARD=${{ matrix.target }} USER_C_MODULES=${{ github.workspace }}/src-st7789/st7789/micropython.cmake
           mkdir -p ${{ github.workspace }}/exports
           cp build-${{ matrix.target }}/firmware.bin ${{ github.workspace }}/exports/firmware-${{ matrix.target }}-${{ steps.get-ref.outputs.version }}.bin
 
