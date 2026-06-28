@@ -128,8 +128,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.event_name == 'workflow_dispatch'
         with:
-          tag_name: "latest-${{ steps.get-ref.outputs.version }}"
-          name: "MicroPython ${{ steps.get-ref.outputs.version }} with ST7789"
+          tag_name: "latest-${{ steps.get-ref.outputs.version }}-${{ github.run_number }}"
+          name: "MicroPython ${{ steps.get-ref.outputs.version }} with ST7789 Build #${{ github.run_number }}"
 
           body: |
             ### 🛠️ Build Metadata Tracking Info
